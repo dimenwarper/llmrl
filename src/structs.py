@@ -13,7 +13,7 @@ class RLBatch:
     states: torch.Tensor
     actions: torch.Tensor
     advantages: torch.Tensor
-    returns: torch.Tensor
     old_log_probs: torch.Tensor
+    returns: Optional[torch.Tensor] = None
     attention_mask: Optional[torch.Tensor] = None
     next_states: Optional[torch.Tensor] = None

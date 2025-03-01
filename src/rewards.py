@@ -241,4 +241,3 @@ class NeuralRewardModel(RewardModel):
             inputs = states
         
         return self.model(inputs).squeeze(-1)
-

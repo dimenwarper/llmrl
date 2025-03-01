@@ -1,14 +1,7 @@
-"""
-RL Framework for LLM Training
-============================
-A modular framework for testing various RL algorithms for training LLMs.
-"""
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, Dict, List, Tuple, Union, Any
 from structs import RLBatch
 
 from abc import ABC, abstractmethod
@@ -67,6 +60,26 @@ class ClippedPolicyGradientLoss(LossComponent):
         # Use min to implement the pessimistic bound (clipping)
         # Negate because we're minimizing the loss (maximizing the objective)
         return -torch.min(surrogate1, surrogate2).mean()
+
+class GroupedPolicyGradientLoss(LossComponent):
+    """GRPO-style clipped policy gradient loss."""
+    
+    def __init__(self, policy_network: nn.Module, clip_ratio: float = 0.2, normalize_advantages: bool = True):
+        self.policy_network = policy_network
+        self.clip_ratio = clip_ratio
+        self.normalize_advantages = normalize_advantages
+    
+    def compute(self, batch: RLBatch) -> torch.Tensor:
+        """
+        Compute PPO clipped policy gradient loss.
+        
+        Args:
+            batch: Batch of experience data
+                
+        Returns:
+            Clipped policy gradient loss
+        """
+ 
 
 
 class EntropyRegularizer(LossComponent):
