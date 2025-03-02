@@ -4,6 +4,7 @@ import torch.optim as optim
 from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 from datasets import load_dataset
 from tqdm import tqdm
+from src import loss
 import time
 
 # Example usage with a HuggingFace model
@@ -86,29 +87,27 @@ def train_huggingface_model():
         {'params': value_net.value_head.parameters(), 'lr': 5e-5}
     ])
     
-    # Create loss components - each now takes its network in constructor
-    clipped_pg_loss = ClippedPolicyGradientLoss(
+    clipped_pg_loss = loss.ClippedPolicyGradientLoss(
         policy_network=policy_net,
         clip_ratio=0.2, 
         normalize_advantages=True
     )
-    entropy_reg = EntropyRegularizer(
+    entropy_reg = loss.EntropyRegularizer(
         policy_network=policy_net,
         coefficient=0.01
     )
-    kl_reg = KLDivergenceRegularizer(
+    kl_reg = loss.KLDivergenceRegularizer(
         policy_network=policy_net,
         coefficient=0.1, 
         target_kl=0.01, 
         adaptive=True
     )
-    value_loss = ValueFunctionLoss(
+    value_loss = loss.ValueFunctionLoss(
         value_network=value_net,
         coefficient=0.5
     )
     
-    # Create composite loss using the + operator
-    loss_fn = (CompositeLoss() 
+    loss_fn = (loss.CompositeLoss() 
               + ("policy_gradient", clipped_pg_loss)
               + ("entropy", entropy_reg) 
               + ("kl_divergence", kl_reg) 
