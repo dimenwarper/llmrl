@@ -3,11 +3,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from structs import RLBatch
+from model_utils import generate_completions
 
 from abc import ABC, abstractmethod
 
 class LossComponent(ABC):
     """Base class for all loss components."""
+    def __init__(self, device=None):
+        self.device = device
     
     @abstractmethod
     def compute(self, batch: RLBatch) -> torch.Tensor:
@@ -16,7 +19,6 @@ class LossComponent(ABC):
         
         Args:
             batch: Batch of experience data
-            
         Returns:
             Loss tensor
         """
@@ -26,8 +28,17 @@ class LossComponent(ABC):
 class ClippedPolicyGradientLoss(LossComponent):
     """PPO-style clipped policy gradient loss."""
     
-    def __init__(self, policy_network: nn.Module, clip_ratio: float = 0.2, normalize_advantages: bool = True):
-        self.policy_network = policy_network
+    def __init__(
+            self,
+            model, 
+            tokenizer, 
+            clip_ratio: float = 0.2, 
+            normalize_advantages: bool = True,
+            **kwargs
+            ):
+        super(LossComponent, self).__init__(**kwargs)
+        self.model = model
+        self.tokenizer = tokenizer
         self.clip_ratio = clip_ratio
         self.normalize_advantages = normalize_advantages
     
@@ -41,16 +52,14 @@ class ClippedPolicyGradientLoss(LossComponent):
         Returns:
             Clipped policy gradient loss
         """
-        # Get current policy probabilities
-        action_probs = self.policy_network(batch.states, batch.attention_mask)
-        log_probs = torch.log(action_probs.gather(1, batch.actions[:, 0].unsqueeze(-1)).squeeze(-1) + 1e-10)
+        batch.rollout_completions(self.model, self.tokenizer)
+        log_probs = batch.completions.log_probs
         
         # Calculate and normalize advantages if needed
         advantages = batch.advantages
         if self.normalize_advantages and advantages.shape[0] > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
             
-        # Calculate probability ratio
         ratio = torch.exp(log_probs - batch.old_log_probs)
         
         # Calculate surrogate losses
@@ -64,14 +73,24 @@ class ClippedPolicyGradientLoss(LossComponent):
 class GroupedPolicyGradientLoss(LossComponent):
     """GRPO-style clipped policy gradient loss."""
     
-    def __init__(self, policy_network: nn.Module, clip_ratio: float = 0.2, normalize_advantages: bool = True):
-        self.policy_network = policy_network
+    def __init__(
+            self, 
+            model: nn.Module, 
+            reward_function: callable,
+            clip_ratio: float = 0.2,
+            epsilon=0.2,
+            num_generations=4,
+            **kwargs
+    ):
+        super(LossComponent, self).__init__(**kwargs)
+        self.model = model
         self.clip_ratio = clip_ratio
-        self.normalize_advantages = normalize_advantages
+        self.num_generations = num_generations
+        self.reward_function = reward_function
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
         """
-        Compute PPO clipped policy gradient loss.
+        Compute GRPO clipped policy gradient loss.
         
         Args:
             batch: Batch of experience data
@@ -79,14 +98,61 @@ class GroupedPolicyGradientLoss(LossComponent):
         Returns:
             Clipped policy gradient loss
         """
- 
+        batch.rollout_completions(
+            self.model, 
+            self.tokenizer, 
+            num_generations=self.num_generations
+        )
+        log_probs = batch.completions.log_probs
+        ratio = torch.exp(log_probs - batch.old_log_probs)
+
+        # Repeat each prompt for each generated completion.
+        repeated_prompts = [p for p in batch.texts for _ in range(self.num_generations)]
+        repeated_targets = [t for t in batch.targets for _ in range(self.num_generations)]
+
+        rewards = torch.tensor(
+            self.reward_function(
+                prompts=repeated_prompts, 
+                completions=batch.completions, 
+                answers=repeated_targets
+                ),
+            dtype=torch.float32,
+            device=self.device
+        )
+
+        # For monitoring, print the average reward.
+        avg_reward = rewards.mean().item()
+        print("Average Reward:", avg_reward)
+
+        # Reshape rewards to group completions by prompt.
+        # Compute mean and standard deviation for each prompt group.
+        mean_rewards = rewards.view(-1, self.num_generations).mean(dim=1)
+        std_rewards = rewards.view(-1, self.num_generations).std(dim=1)
+        # Expand the means and stds to match the original flat rewards tensor shape.
+        mean_rewards = mean_rewards.repeat_interleave(self.num_generations, dim=0)
+        std_rewards = std_rewards.repeat_interleave(self.num_generations, dim=0)
+        advantages = (rewards - mean_rewards) / (std_rewards + 1e-4)
+
+        # Calculate surrogate losses
+        surrogate1 = ratio * advantages
+        surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
+        
+        # Use min to implement the pessimistic bound (clipping)
+        # Negate because we're minimizing the loss (maximizing the objective)
+        return -torch.min(surrogate1, surrogate2).mean()
 
 
 class EntropyRegularizer(LossComponent):
     """Entropy regularization to encourage exploration."""
     
-    def __init__(self, policy_network: nn.Module, coefficient: float = 0.01):
-        self.policy_network = policy_network
+    def __init__(
+            self, 
+            model = None, 
+            tokenizer = None,
+            coefficient: float = 0.01
+            ):
+        self.model = model
+        self.tokenizer = tokenizer
         self.coefficient = coefficient
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
@@ -99,21 +165,28 @@ class EntropyRegularizer(LossComponent):
         Returns:
             Entropy regularization loss
         """
-        # Get current policy probabilities
-        action_probs = self.policy_network(batch.states, batch.attention_mask)
-        
-        # Compute entropy
+        batch.rollout_completions(
+            self.model, 
+            self.tokenizer, 
+        )
+        action_probs = np.exp(batch.completions.log_probs)
         entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1).mean()
-        
-        # Negative coefficient because we want to maximize entropy (minimize negative entropy)
         return -self.coefficient * entropy
 
 
 class KLDivergenceRegularizer(LossComponent):
     """KL divergence penalty to limit policy updates (like in PPO)."""
     
-    def __init__(self, policy_network: nn.Module, coefficient: float = 0.1, target_kl: float = 0.01, adaptive: bool = True):
-        self.policy_network = policy_network
+    def __init__(
+            self, 
+            model = None,
+            tokenizer = None,
+            coefficient: float = 0.1, 
+            target_kl: float = 0.01, 
+            adaptive: bool = True
+            ):
+        self.model = model
+        self.tokenizer = tokenizer
         self.coefficient = coefficient
         self.target_kl = target_kl
         self.adaptive = adaptive
@@ -128,17 +201,9 @@ class KLDivergenceRegularizer(LossComponent):
         Returns:
             KL divergence regularization loss
         """
-        # Get current policy probabilities
-        current_probs = self.policy_network(batch.states, batch.attention_mask)
-        old_probs = torch.exp(batch.old_log_probs)
-        
-        # Compute KL divergence
-        kl_div = F.kl_div(
-            torch.log(current_probs + 1e-8),
-            old_probs,
-            reduction='batchmean',
-            log_target=False
-        )
+        batch.rollout_completions(self.model, self.tokenizer)
+        log_probs = batch.completions.log_probs
+        kl_div = torch.exp(batch.old_log_probs - log_probs) - (batch.old_log_probs - log_probs) - 1
         
         # Adaptive coefficient based on how far we are from target KL
         if self.adaptive:
@@ -166,7 +231,7 @@ class ValueFunctionLoss(LossComponent):
             Value function loss
         """
         # Predict values
-        predicted_values = self.value_network(batch.states, batch.attention_mask)
+        predicted_values = self.value_network(batch.prompt_ids, batch.attention_mask)
         
         # Compute MSE loss
         return self.coefficient * F.mse_loss(predicted_values, batch.returns)
@@ -191,10 +256,10 @@ class MuZeroConsistencyLoss(LossComponent):
         """
         # Skip if missing required inputs
         if batch.next_states is None:
-            return torch.tensor(0.0, device=batch.states.device)
+            return torch.tensor(0.0, device=batch.prompt_ids.device)
         
         # Predict next states using dynamics model
-        predicted_states = self.dynamics_model(batch.states, batch.actions)
+        predicted_states = self.dynamics_model(batch.prompt_ids, batch.completions)
         
         # Compute MSE loss
         return self.coefficient * F.mse_loss(predicted_states, batch.next_states)
