@@ -31,7 +31,9 @@ class ClippedPolicyGradientLoss(LossComponent):
     def __init__(
             self,
             model, 
+            value_model,
             tokenizer, 
+            reward_function: callable,
             clip_ratio: float = 0.2, 
             normalize_advantages: bool = True,
             **kwargs
@@ -41,6 +43,8 @@ class ClippedPolicyGradientLoss(LossComponent):
         self.tokenizer = tokenizer
         self.clip_ratio = clip_ratio
         self.normalize_advantages = normalize_advantages
+        self.value_model = value_model
+        self.reward_function = reward_function
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
         """
@@ -54,6 +58,18 @@ class ClippedPolicyGradientLoss(LossComponent):
         """
         batch.rollout_completions(self.model, self.tokenizer)
         log_probs = batch.completions.log_probs
+
+        rewards = torch.tensor(
+            self.reward_function(
+                prompts=batch.texts, 
+                completions=batch.completions, 
+                answers=batch.targets
+                ),
+            dtype=torch.float32,
+            device=self.device
+        )
+
+        values = compute_values(self.value_model, batch.completions)
         
         # Calculate and normalize advantages if needed
         advantages = batch.advantages
