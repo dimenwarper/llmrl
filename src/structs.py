@@ -20,7 +20,8 @@ class Completions:
 def generate_completions(
         model, 
         tokenizer, 
-        prompts, 
+        prompt_ids, 
+        prompt_mask,
         num_generations=1, 
         max_completion_length=32,
         no_grad_for_log_probs=False,
@@ -42,13 +43,8 @@ def generate_completions(
             - completion_ids: (batch_size * num_generations, completion_seq_len)
             - completion_mask: (batch_size * num_generations, completion_seq_len)
     """
-    device = next(model.parameters()).device
 
-    # Tokenize the list of prompts with padding. Note we are assuming padding side = left!!!
-    inputs = tokenizer(prompts, return_tensors="pt", padding=True)
-    prompt_ids = inputs["input_ids"].to(device)      # Shape: (batch_size, prompt_seq_len)
-    prompt_mask = inputs["attention_mask"].to(device)  # Shape: (batch_size, prompt_seq_len)
-    prompt_length = prompt_ids.size(1)  # Save the prompt length to later separate prompt from completion.
+    prompt_length = prompt_ids.size(1)
 
     # Repeat each prompt num_generations times.
     prompt_ids = prompt_ids.repeat_interleave(num_generations, dim=0)   # New shape: (batch_size*num_generations, prompt_seq_len)
@@ -127,7 +123,8 @@ class RLBatch:
             completions = generate_completions(
                 model=model,
                 tokenizer=tokenizer,
-                prompts=self.prompt_ids,
+                prompt_ids=self.prompt_ids,
+                prompt_mask=self.attention_mask,
                 num_generations=num_generations,
                 max_completion_length=max_completion_length
             )
