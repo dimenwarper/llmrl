@@ -210,6 +210,7 @@ class GroupedPolicyGradientLoss(LossComponent):
 class MuesliPolicyLoss(LossComponent):
     """
     Muesli-style policy improvement loss.
+    [Still WIP]
     """
     
     def __init__(
@@ -334,7 +335,10 @@ class EntropyRegularizer(LossComponent):
 
 
 class KLDivergenceRegularizer(LossComponent):
-    """KL divergence penalty to limit policy updates (like in PPO)."""
+    """
+    Still WIP!
+    KL divergence penalty to limit policy updates (like in PPO).
+    """
     
     def __init__(
             self, 
@@ -364,7 +368,10 @@ class KLDivergenceRegularizer(LossComponent):
 
 
 class ValueFunctionLoss(LossComponent):
-    """Value function loss for critic training."""
+    """
+    Still WIP!
+    Value function loss for critic training.
+    """
     
     def __init__(self, value_network: nn.Module, coefficient: float = 0.5):
         self.value_network = value_network
@@ -378,20 +385,35 @@ class ValueFunctionLoss(LossComponent):
 class MuZeroConsistencyLoss(LossComponent):
     """MuZero-style consistency loss between predicted and observed dynamics."""
     
-    def __init__(self, dynamics_model: nn.Module, coefficient: float = 1.0):
+    def __init__(
+            self, 
+            dynamics_function, 
+            dynamics_model, 
+            tokenizer,
+            coefficient: float = 1.0
+            ):
+        # The dynamics function should be (prompt_texts, completion_texts) => (new_texts)
+        self.dynamics_function = dynamics_function
+        # The dynamics model should predict the next prompts and should be (prompt_texts, completion_texts) => (predicted_new_texts)
         self.dynamics_model = dynamics_model
+        self.tokenizer = tokenizer
         self.coefficient = coefficient
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
-        # Skip if missing required inputs
-        if batch.next_states is None:
-            return torch.tensor(0.0, device=batch.prompt_ids.device)
-        
+        # We assume completions are already set up,
+        # we still rollout here to ensure that completions actually did happen
+        # (calling rollout_completions with None, None should check this)
+        batch.rollout_completions(None, None)
+        next_texts = self.dynamics_function(batch.texts, batch.completions.texts)
+
         # Predict next states using dynamics model
-        predicted_states = self.dynamics_model(batch.prompt_ids, batch.completions)
+        predicted_next_texts = self.dynamics_model(batch.texts, batch.completions.texts)
+
+        predicted = self.tokenizer(predicted_next_texts, return_tensors="pt", padding=True)
+        actual = self.tokenizer(next_texts, return_tensors="pt", padding=True)
         
         # Compute MSE loss
-        return self.coefficient * F.mse_loss(predicted_states, batch.next_states)
+        return self.coefficient * F.mse_loss(predicted, actual)
 
 
 class CompositeLoss:
