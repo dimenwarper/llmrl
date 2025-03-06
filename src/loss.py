@@ -8,8 +8,9 @@ from abc import ABC, abstractmethod
 
 class LossComponent(ABC):
     """Base class for all loss components."""
-    def __init__(self, device=None):
+    def __init__(self, device=None, name=None):
         self.device = device
+        self.name = name or self.__class__.__name__
     
     @abstractmethod
     def compute(self, batch: RLBatch) -> torch.Tensor:
@@ -107,9 +108,10 @@ class ClippedPolicyGradientLoss(LossComponent):
             discount_factor: float = 0.99,
             gae_lambda: float = 0.95,
             normalize_advantages: bool = True,
+            name: str = None,
             **kwargs
             ):
-        super(LossComponent, self).__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
         self.model = model
         self.tokenizer = tokenizer
         self.clip_ratio = clip_ratio
@@ -162,9 +164,10 @@ class GroupedPolicyGradientLoss(LossComponent):
             reward_function: callable,
             clip_ratio: float = 0.2,
             num_generations=4,
+            name: str = None,
             **kwargs
     ):
-        super(LossComponent, self).__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
         self.model = model
         self.clip_ratio = clip_ratio
         self.num_generations = num_generations
@@ -226,9 +229,10 @@ class MuesliPolicyLoss(LossComponent):
             max_importance_weight: float = 10.0,
             min_importance_weight: float = 0.1,
             coefficient: float = 1.0,
+            name: str = None,
             **kwargs
             ):
-        super().__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
         self.model = model
         self.value_model = value_model
         self.tokenizer = tokenizer
@@ -318,8 +322,10 @@ class EntropyRegularizer(LossComponent):
             self, 
             model = None, 
             tokenizer = None,
-            coefficient: float = 0.01
+            coefficient: float = 0.01,
+            name: str = None
             ):
+        super().__init__(name=name)
         self.model = model
         self.tokenizer = tokenizer
         self.coefficient = coefficient
@@ -346,8 +352,10 @@ class KLDivergenceRegularizer(LossComponent):
             tokenizer = None,
             coefficient: float = 0.1, 
             target_kl: float = 0.01, 
-            adaptive: bool = True
+            adaptive: bool = True,
+            name: str = None
             ):
+        super().__init__(name=name)
         self.model = model
         self.tokenizer = tokenizer
         self.coefficient = coefficient
@@ -373,7 +381,13 @@ class ValueFunctionLoss(LossComponent):
     Value function loss for critic training.
     """
     
-    def __init__(self, value_network: nn.Module, coefficient: float = 0.5):
+    def __init__(
+            self, 
+            value_network: nn.Module, 
+            coefficient: float = 0.5,
+            name: str = None
+            ):
+        super().__init__(name=name)
         self.value_network = value_network
         self.coefficient = coefficient
     
@@ -390,7 +404,8 @@ class MuZeroConsistencyLoss(LossComponent):
             dynamics_function, 
             dynamics_model, 
             tokenizer,
-            coefficient: float = 1.0
+            coefficient: float = 1.0,
+            name: str = None
             ):
         # The dynamics function should be (prompt_texts, completion_texts) => (new_texts)
         self.dynamics_function = dynamics_function
@@ -398,6 +413,7 @@ class MuZeroConsistencyLoss(LossComponent):
         self.dynamics_model = dynamics_model
         self.tokenizer = tokenizer
         self.coefficient = coefficient
+        super().__init__(name=name)
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
         # We assume completions are already set up,
@@ -424,40 +440,25 @@ class CompositeLoss:
     def __init__(self, components=None):
         self.components = components or {}
     
-    def __add__(self, other):
+    def __add__(self, component: LossComponent):
         """
         Overload the + operator to allow intuitive building of loss functions.
+        Basically just syntax sugar over add_component
         
         Example:
-            loss_fn = CompositeLoss() + ("policy_gradient", pg_loss) + ("entropy", entropy_reg)
+            loss_fn = CompositeLoss() + ClippedPolicyGradient(...) + Entropy(...)
         """
-        if isinstance(other, tuple) and len(other) == 2:
-            name, component = other
-            new_components = self.components.copy()
-            new_components[name] = component
-            return CompositeLoss(new_components)
-        raise ValueError("Can only add a (name, component) tuple to CompositeLoss")
-    
-    def add_component(self, name: str, component: LossComponent):
-        """Add a loss component."""
-        self.components[name] = component
+        self.add_component(component)
+        return self
+
+    def add_component(self, component: LossComponent):
+        self.components[component.name] = component
     
     def remove_component(self, name: str):
-        """Remove a loss component."""
         if name in self.components:
             del self.components[name]
     
     def compute(self, batch: RLBatch, track_components=False):
-        """
-        Compute the composite loss.
-        
-        Args:
-            batch: Batch of experience data
-            track_components: Whether to track individual loss components
-            
-        Returns:
-            Total loss (and optionally a dictionary of individual loss components)
-        """
         total_loss = 0.0
         component_losses = {}
         

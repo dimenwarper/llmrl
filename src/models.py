@@ -32,6 +32,20 @@ def hf_model(model_name, device, quantized=True, tokenizer_name=None):
     )
     return model, tokenizer 
 
+class SimpleValueNetwork(nn.Module):
+    def __init__(self, base_model, tokenizer):
+        super().__init__()
+        self.base_model = base_model
+        self.value_head = nn.Linear(base_model.config.hidden_size, 1)
+        self.tokenizer = tokenizer
+        
+    def forward(self, input_ids, attention_mask=None):
+        outputs = self.base_model(input_ids, attention_mask=attention_mask, output_hidden_states=True)
+        last_hidden = outputs.hidden_states[-1][:, -1, :]
+        value = self.value_head(last_hidden)
+        return value.squeeze(-1)
+
+
 
 class LLMPEFTRegressor(nn.Module):
     def __init__(self, model, target_modules=None, rank=8, lora_alpha=32, lora_dropout=0.1):

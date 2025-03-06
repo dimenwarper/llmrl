@@ -16,6 +16,13 @@ class Completions:
     texts: list[str]
     completion_mask: Optional[torch.Tensor] = None
 
+    def to(self, device):
+        self.completion_ids = self.completion_ids.to(device)
+        self.log_probs = self.log_probs.to(device)
+        if self.completion_mask is not None:
+            self.completion_mask = self.completion_mask.to(device)
+        return self
+
 
 def generate_completions(
         model, 
@@ -107,6 +114,20 @@ class RLBatch:
     returns: Optional[torch.Tensor] = None
     attention_mask: Optional[torch.Tensor] = None
     completions: Optional[Completions] = None
+
+    def to(self, device):
+        self.prompt_ids = self.prompt_ids.to(device)
+        self.values = self.values.to(device)
+        self.old_log_probs = self.old_log_probs.to(device)
+        
+        if self.returns is not None:
+            self.returns = self.returns.to(device)
+        if self.attention_mask is not None:
+            self.attention_mask = self.attention_mask.to(device)
+        if self.completions is not None:
+            self.completions = self.completions.to(device)
+        
+        return self
 
     def rollout_completions(
                 self, 
