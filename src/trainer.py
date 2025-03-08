@@ -10,7 +10,7 @@ class Trainer:
         self,
         composite_loss,
         optimizer_kwargs: dict,
-        max_grad_norm: float = 1.0, # For clipping
+        max_grad_norm: float = 1.0, # For grad clipping
         device: str = "cuda" if torch.cuda.is_available() else "cpu"
     ):
         self.composite_loss = composite_loss
@@ -70,6 +70,9 @@ class Trainer:
             if callbacks:
                 for callback in callbacks:
                     callback(self, epoch, epoch_losses)
+
+            self.composite_loss.epoch_callback()
+            
 
 # Example usage:
 if __name__ == "__main__":

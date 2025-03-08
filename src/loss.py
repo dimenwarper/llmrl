@@ -13,6 +13,12 @@ class LossComponent(ABC):
         self.device = device
         self.name = name or self.__class__.__name__
     
+    def epoch_callback(self):
+        """
+        Any custom loss logic that is called after an optimizer step
+        """
+        pass
+    
     @abstractmethod
     def compute(self, batch: RLBatch) -> torch.Tensor:
         """
@@ -363,11 +369,14 @@ class KLDivergenceRegularizer(LossComponent):
         self.target_kl = target_kl
         self.adaptive = adaptive
     
+    def epoch_callback(self):
+        self.reference_model = model_utils.generate_reference_model(self.model)
+    
     def compute(self, batch: RLBatch) -> torch.Tensor:
         batch.rollout_completions(self.reference_model, self.tokenizer)
         ref_log_probs = batch.completions.log_probs
         log_probs = batch.compute_full_sequence_logprobs(self.model)
-        kl_div = torch.exp(batch.old_log_probs - log_probs) - (batch.old_log_probs - log_probs) - 1
+        kl_div = torch.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1
         
         # Adaptive coefficient based on how far we are from target KL
         if self.adaptive:
@@ -459,6 +468,10 @@ class CompositeLoss:
     def remove_component(self, name: str):
         if name in self.components:
             del self.components[name]
+    
+    def epoch_callback(self):
+        for component in self.components.values():
+            component.epoch_callback()
     
     def compute(self, batch: RLBatch, track_components=False):
         total_loss = 0.0
