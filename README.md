@@ -1,4 +1,6 @@
-# llmrl: Composable Reinforcement Learning for Language Models
+# llmrl
+
+## Composable Reinforcement Learning for Language Models
 
 A flexible framework for training LLMs using various Reinforcement Learning techniques, with a focus on composable and customizable loss functions. The loss function is the main object here, which allows you to design your own RL scheme supporting combinations of reward signals as well as more complex settings like multi turn RL.
 
@@ -17,7 +19,7 @@ Main features:
 
 The goal of this project is to be able to do things like this:
 
-```
+```python
 grpo_loss_1 = loss.GroupedPolicyGradientLoss(
         name="policy_gradient_1",
         model=model,
