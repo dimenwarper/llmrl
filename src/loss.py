@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from structs import RLBatch
+from . import model_utils
 
 from abc import ABC, abstractmethod
 
@@ -148,7 +149,7 @@ class ClippedPolicyGradientLoss(LossComponent):
         if self.normalize_advantages and advantages.shape[0] > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
             
-        ratio = torch.exp(log_probs - batch.old_log_probs)
+        ratio = torch.exp(log_probs - batch.completions.old_log_probs)
         
         surrogate1 = ratio * advantages
         surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
@@ -180,7 +181,7 @@ class GroupedPolicyGradientLoss(LossComponent):
             num_generations=self.num_generations
         )
         log_probs = batch.completions.log_probs
-        ratio = torch.exp(log_probs - batch.old_log_probs)
+        ratio = torch.exp(log_probs - batch.completions.old_log_probs)
 
         # Repeat each prompt for each generated completion.
         repeated_prompts = [p for p in batch.texts for _ in range(self.num_generations)]
@@ -342,7 +343,6 @@ class EntropyRegularizer(LossComponent):
 
 class KLDivergenceRegularizer(LossComponent):
     """
-    Still WIP!
     KL divergence penalty to limit policy updates (like in PPO).
     """
     
@@ -357,14 +357,16 @@ class KLDivergenceRegularizer(LossComponent):
             ):
         super().__init__(name=name)
         self.model = model
+        self.reference_model = model_utils.generate_reference_model(self.model)
         self.tokenizer = tokenizer
         self.coefficient = coefficient
         self.target_kl = target_kl
         self.adaptive = adaptive
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
-        batch.rollout_completions(self.model, self.tokenizer)
-        log_probs = batch.completions.log_probs
+        batch.rollout_completions(self.reference_model, self.tokenizer)
+        ref_log_probs = batch.completions.log_probs
+        log_probs = batch.compute_full_sequence_logprobs(self.model)
         kl_div = torch.exp(batch.old_log_probs - log_probs) - (batch.old_log_probs - log_probs) - 1
         
         # Adaptive coefficient based on how far we are from target KL

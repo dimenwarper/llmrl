@@ -13,12 +13,14 @@ class Completions:
     """Data structure for completions (including logprobs)"""
     completion_ids: torch.Tensor
     log_probs: torch.Tensor
+    old_log_probs: torch.Tensor
     texts: list[str]
     completion_mask: Optional[torch.Tensor] = None
 
     def to(self, device):
         self.completion_ids = self.completion_ids.to(device)
         self.log_probs = self.log_probs.to(device)
+        self.old_log_probs = self.old_log_probs.to(device)
         if self.completion_mask is not None:
             self.completion_mask = self.completion_mask.to(device)
         return self
@@ -81,11 +83,11 @@ def generate_completions(
     # Get the logits
     logits_to_keep = completion_ids.size(1)
 
-    if no_grad_for_log_probs:
-        with torch.no_grad():
-            token_log_probs = compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
-    else:
-        token_log_probs = compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
+    # Store the old log probs
+    with torch.no_grad():
+        old_log_probs = compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
+
+    token_log_probs = compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
 
     texts = [
         tokenizer.decode(ids, skip_special_tokens=True)
@@ -96,7 +98,8 @@ def generate_completions(
         completion_ids=completion_ids, 
         completion_mask=completion_mask,
         texts=texts,
-        log_probs=token_log_probs
+        log_probs=token_log_probs,
+        old_log_probs=old_log_probs
     )
 
 
@@ -110,7 +113,6 @@ class RLBatch:
     targets: list[str]
     texts: list[str]
     values: torch.Tensor
-    old_log_probs: torch.Tensor
     returns: Optional[torch.Tensor] = None
     attention_mask: Optional[torch.Tensor] = None
     completions: Optional[Completions] = None
@@ -118,7 +120,6 @@ class RLBatch:
     def to(self, device):
         self.prompt_ids = self.prompt_ids.to(device)
         self.values = self.values.to(device)
-        self.old_log_probs = self.old_log_probs.to(device)
         
         if self.returns is not None:
             self.returns = self.returns.to(device)
@@ -128,6 +129,16 @@ class RLBatch:
             self.completions = self.completions.to(device)
         
         return self
+    
+    def compute_full_sequence_logprobs(self, model):
+        assert self.copmletions is not None, "Completions are None! Did you forget to rollout_completions?"
+        input_ids = torch.cat([self.prompt_ids, self.completions.completion_ids], dim=1)
+        attention_mask = torch.cat([self.attention_mask, self.completions.completion_mask], dim=1)
+
+        # Get the logits
+        logits_to_keep = self.completions.completion_ids.size(1)
+
+        return compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
 
     def rollout_completions(
                 self, 

@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from . import structs
+import copy
 
 def compute_log_probs(model, input_ids, attention_mask, logits_to_keep):
     """
@@ -61,3 +61,11 @@ def create_completion_mask(completion_ids, eos_token_id):
     completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
     
     return completion_mask
+
+def generate_reference_model(model):
+    reference_model = copy.deepcopy(policy_model)
+    reference_model.eval()
+    for param in reference_model.parameters():
+        param.requires_grad = False
+    reference_model = reference_model.to()
+    return reference_model
