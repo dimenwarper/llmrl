@@ -17,15 +17,11 @@ class Eval:
 
     def extract_training_data(self, num_samples, split='train'):
         train_data = self.dataset[split][:num_samples]
-        extracted_train_data = []
+        prompts, answers = [], []
         for i in range(num_samples):
-            extracted_train_data.append(
-                {
-                    "prompt": train_data["question"][i],
-                    "answer": self._extract_dataset_answer(train_data["answer"][i])
-                }
-            )
-        return extracted_train_data
+                prompts.append(train_data["question"][i])
+                answers.append(self._extract_dataset_answer(train_data["answer"][i])
+        return prompts, answers 
 
     def _extract_numeric_answer(self, text):
         """

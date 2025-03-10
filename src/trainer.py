@@ -10,8 +10,8 @@ class Trainer:
         self,
         composite_loss,
         optimizer_kwargs: dict,
+        device,
         max_grad_norm: float = 1.0, # For grad clipping
-        device: str = "cuda" if torch.cuda.is_available() else "cpu"
     ):
         self.composite_loss = composite_loss
         self.device = device
@@ -72,62 +72,3 @@ class Trainer:
                     callback(self, epoch, epoch_losses)
 
             self.composite_loss.epoch_callback()
-            
-
-# Example usage:
-if __name__ == "__main__":
-    from loss import (
-        CompositeLoss,
-        ClippedPolicyGradientLoss,
-        EntropyRegularizer,
-        ValueFunctionLoss
-    )
-    import torch.nn as nn
-    
-    # Example model definitions
-    class SimplePolicy(nn.Module):
-        def forward(self, x): return x
-    
-    class SimpleValue(nn.Module):
-        def forward(self, x): return x
-    
-    # Create models
-    policy_model = SimplePolicy()
-    value_model = SimpleValue()
-    
-    # Define reward function
-    def dummy_reward(prompts, completions, answers):
-        return [1.0] * len(prompts)  # Dummy rewards
-    
-    # Create composite loss
-    loss_fn = (
-        CompositeLoss()
-        + ("pg", ClippedPolicyGradientLoss(
-            model=policy_model,
-            value_model=value_model,
-            tokenizer=None,  # Add your tokenizer here
-            reward_function=dummy_reward
-        ))
-        + ("entropy", EntropyRegularizer(
-            model=policy_model,
-            coefficient=0.01
-        ))
-        + ("value", ValueFunctionLoss(
-            value_network=value_model,
-            coefficient=0.5
-        ))
-    )
-    
-    
-    
-    # Example callback
-    def log_epoch(trainer, epoch, losses):
-        avg_loss = sum(l["total_loss"] for l in losses) / len(losses)
-        print(f"Epoch {epoch} completed. Average loss: {avg_loss:.4f}")
-    
-    # Training would look like this:
-    # trainer.train(
-    #     train_dataloader=your_dataloader,
-    #     num_epochs=10,
-    #     callbacks=[log_epoch]
-    # )

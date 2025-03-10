@@ -1,23 +1,17 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
-from datasets import load_dataset
-from tqdm import tqdm
 from src import loss, models
 from src.trainer import Trainer
-import time
+from src.evals import Eval
+from src.structs import RLBatch
 
-def train_huggingface_model(
+def run(
         model_path,
-        tokenizer_path,
-        device
+        tokenizer_path=None,
+        batch_size=32,
 ):
-    """
-    Example showing how to train a HuggingFace model using the framework.
-    """
-   
+    print("Loadng model...")
     #model_name = "distilgpt2"  # Using a small model for demonstration
+    tokenizer_path = tokenizer_path if tokenizer_path is not None else model_path
     model, tokenizer = models.hf_model(model_path, device, tokenizer_path)
     
     special_tokens = {"pad_token": "[PAD]"}
@@ -27,8 +21,19 @@ def train_huggingface_model(
             model.resize_token_embeddings(len(tokenizer))
     
     
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     print("Loading dataset...")
-    dataset = load_dataset("imdb", split="train[:100]")  
+    evl = Eval(model, "openai/gsm8k", num_samples=50)
+    train_prompts, train_answers = evl.extract_training_data(num_samples=50)
+    train_data = RLBatch.from_tokenizer(
+        tokenizer=tokenizer,
+        prompts=train_prompts,
+        targets=train_answers,
+        batch_size=batch_size,
+        device=device
+    )
+
 
     def reward_fun():
         pass
@@ -40,11 +45,13 @@ def train_huggingface_model(
         clip_ratio=0.2, 
         normalize_advantages=True
     )
+
     entropy_reg = loss.EntropyRegularizer(
         name="entropy_regularizer",
         model=model,
         coefficient=0.01
     )
+
     kl_reg = loss.KLDivergenceRegularizer(
         name="kl_div_regularizer",
         model=model,
@@ -56,13 +63,14 @@ def train_huggingface_model(
     loss_fn = loss.CompositeLoss() + clipped_pg_loss + entropy_reg + kl_reg
     
     trainer = Trainer(
-        dataset=dataset,
         composite_loss=loss_fn,
+        device=device,
         optimizer_kwargs={"learning_rate": 1e-4}
     )
     
     
     trainer.train(
+        train_data,
          num_epochs=10,
     )
     

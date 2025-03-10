@@ -112,14 +112,30 @@ class RLBatch:
     prompt_ids: torch.Tensor
     targets: list[str]
     texts: list[str]
-    values: torch.Tensor
     returns: Optional[torch.Tensor] = None
     attention_mask: Optional[torch.Tensor] = None
     completions: Optional[Completions] = None
 
+    @classmethod
+    def from_tokenizer(tokenizer, prompts, targets, batch_size, device=None) -> list[RLBatch]:
+        assert len(prompts) == len(targets)
+        batches = []
+        for i in range(0, len(prompts), batch_size):
+            b_end = min(len(prompts), i + batch_size)
+            tokenized = tokenizer(prompts[i:b_end], return_tensors="pt", padding=True, padding_side="left")
+            batch = RLBatch(
+                    prompt_ids=tokenized["input_ids"],
+                    attention_mask=tokenized["attention_mask"],
+                    texts=prompts[i:b_end],
+                    targets=targets[i:b_end],
+                )
+            if device is not None:
+                batch.to(device)
+            batches.append(batch)
+        return batches
+
     def to(self, device):
         self.prompt_ids = self.prompt_ids.to(device)
-        self.values = self.values.to(device)
         
         if self.returns is not None:
             self.returns = self.returns.to(device)
