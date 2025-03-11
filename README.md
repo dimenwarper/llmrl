@@ -20,18 +20,14 @@ Main features:
 The goal of this project is to be able to do things like this:
 
 ```python
-grpo_loss_1 = loss.GroupedPolicyGradientLoss(
-        name="policy_gradient_1",
+grpo_loss = loss.GroupedPolicyGradientLoss(
+        name="policy_gradient",
         model=model,
-        reward_function=reward_fun_1,
-        clip_ratio=0.2, 
-        normalize_advantages=True
-    )
-
-grpo_loss_2 = loss.GroupedPolicyGradientLoss(
-        name="policy_gradient_2",
-        model=model,
-        reward_function=reward_fun_2,
+        reward_function=(
+            0.5 * rewards.ExactMatch()
+            + 10 * rewards.FormatMatch(pattern="\d+")
+            + 0.5 * rewards.ExternalTool(tool_fn=simulator)
+        )
         clip_ratio=0.2, 
         normalize_advantages=True
     )
@@ -41,6 +37,7 @@ entropy_reg = loss.EntropyRegularizer(
     model=model,
     coefficient=0.01
 )
+
 kl_reg = loss.KLDivergenceRegularizer(
     name="kl_div_regularizer",
     model=model,
@@ -49,7 +46,7 @@ kl_reg = loss.KLDivergenceRegularizer(
     adaptive=True
 )
 
-loss_fn = loss.CompositeLoss() + grpo_loss_1 + grpo_loss_2 + entropy_reg + kl_reg
+loss_fn = loss.CompositeLoss() + grpo_loss + entropy_reg + kl_reg
 
 trainer = Trainer(
     dataset=dataset,
