@@ -20,7 +20,7 @@ class Eval:
         prompts, answers = [], []
         for i in range(num_samples):
                 prompts.append(train_data["question"][i])
-                answers.append(self._extract_dataset_answer(train_data["answer"][i])
+                answers.append(self._extract_dataset_answer(train_data["answer"][i]))
         return prompts, answers 
 
     def _extract_numeric_answer(self, text):
