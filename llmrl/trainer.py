@@ -1,7 +1,7 @@
 import torch
 from typing import Dict, List, Optional, Union
 from torch.optim import Adam
-from structs import RLBatch
+from llmrl.structs import RLBatch
 
 class Trainer:
     """Trainer class for reinforcement learning with composite losses."""

@@ -2,11 +2,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from structs import RLBatch
-from . import model_utils
 from typing import Union, Callable
-from rewards import RewardFunction
-from dynamics import Dynamics
+from llmrl.structs import RLBatch
+from llmrl import model_utils
+from llmrl.rewards import RewardFunction
+from llmrl.dynamics import Dynamics
 
 from abc import ABC, abstractmethod
 

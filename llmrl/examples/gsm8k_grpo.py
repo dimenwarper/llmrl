@@ -1,9 +1,9 @@
 import torch
 import argparse
-from src import loss, models, rewards
-from src.trainer import Trainer
-from src.evals import Eval
-from src.structs import RLBatch
+from llmrl import loss, models, rewards
+from llmrl.trainer import Trainer
+from llmrl.evals import Eval
+from llmrl.structs import RLBatch
 
 def run(
         model_path,
@@ -87,16 +87,16 @@ def run(
 
 def main():
     parser = argparse.ArgumentParser(description="Train a model on GSM8K using GRPO")
-    parser.add_argument("--model_path", type=str, required=True, help="Path to the model or model name on HuggingFace")
-    parser.add_argument("--tokenizer_path", type=str, default=None, help="Path to the tokenizer (defaults to model_path)")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
-    parser.add_argument("--num_samples", type=int, default=50, help="Number of samples to use from GSM8K")
-    parser.add_argument("--num_epochs", type=int, default=10, help="Number of training epochs")
-    parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for the optimizer")
-    parser.add_argument("--clip_ratio", type=float, default=0.2, help="Clipping ratio for PPO")
-    parser.add_argument("--entropy_coef", type=float, default=0.01, help="Entropy regularization coefficient")
-    parser.add_argument("--kl_coef", type=float, default=0.1, help="KL divergence regularization coefficient")
-    parser.add_argument("--target_kl", type=float, default=0.01, help="Target KL divergence")
+    parser.add_argument("--model-path", type=str, required=True, help="Path to the model or model name on HuggingFace")
+    parser.add_argument("--tokenizer-path", type=str, default=None, help="Path to the tokenizer (defaults to model-path)")
+    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for training")
+    parser.add_argument("--num-samples", type=int, default=50, help="Number of samples to use from GSM8K")
+    parser.add_argument("--num-epochs", type=int, default=10, help="Number of training epochs")
+    parser.add_argument("--learning-rate", type=float, default=1e-4, help="Learning rate for the optimizer")
+    parser.add_argument("--clip-ratio", type=float, default=0.2, help="Clipping ratio for PPO")
+    parser.add_argument("--entropy-coef", type=float, default=0.01, help="Entropy regularization coefficient")
+    parser.add_argument("--kl-coef", type=float, default=0.1, help="KL divergence regularization coefficient")
+    parser.add_argument("--target-kl", type=float, default=0.01, help="Target KL divergence")
     parser.add_argument("--device", type=str, default=None, help="Device to use (defaults to CUDA if available, else CPU)")
     
     args = parser.parse_args()

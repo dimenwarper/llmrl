@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional, Dict, List, Tuple, Union, Any
-from structs import RLBatch
+from llmrl.structs import RLBatch
 
 class MCTS:
     """Monte Carlo Tree Search for LLM action selection."""

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional, Dict, List, Tuple, Union, Any
-from .model_utils import create_completion_mask, compute_log_probs
+from llmrl.model_utils import create_completion_mask, compute_log_probs
 
 @dataclass
 class Completions:
