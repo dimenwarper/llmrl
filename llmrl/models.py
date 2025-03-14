@@ -5,7 +5,7 @@ from transformers import GPT2Model, GPT2Tokenizer
 from peft import get_peft_model, LoraConfig, TaskType
 
 
-def hf_model(model_name, device, quantized=True, tokenizer_name=None):
+def hf_model(model_name, quantized=True, tokenizer_name=None):
     """Set up the model and tokenizer"""
     tokenizer_name = tokenizer_name if tokenizer_name is not None else model_name
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, padding_side='left')
@@ -19,16 +19,17 @@ def hf_model(model_name, device, quantized=True, tokenizer_name=None):
         model_name, 
         load_in_8bit=quantized
     )
-    
+
+    device = None
+
     if not quantized:
-        model.to(device)
+        model.to("cuda" if torch.cuda.is_available() else "cpu")
     
-    device_map = -1 if torch.cuda.is_available() else -1
     generator = pipeline(
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        device=device_map
+        device=device
     )
     return model, tokenizer 
 

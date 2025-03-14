@@ -117,7 +117,7 @@ class RLBatch:
     completions: Optional[Completions] = None
 
     @classmethod
-    def from_tokenizer(tokenizer, prompts, targets, batch_size, device=None) -> list[RLBatch]:
+    def from_tokenizer(cls, tokenizer, prompts, targets, batch_size, device=None) -> list[RLBatch]:
         assert len(prompts) == len(targets)
         batches = []
         for i in range(0, len(prompts), batch_size):
@@ -147,7 +147,7 @@ class RLBatch:
         return self
     
     def compute_full_sequence_logprobs(self, model):
-        assert self.copmletions is not None, "Completions are None! Did you forget to rollout_completions?"
+        assert self.completions is not None, "Completions are None! Did you forget to rollout_completions?"
         input_ids = torch.cat([self.prompt_ids, self.completions.completion_ids], dim=1)
         attention_mask = torch.cat([self.attention_mask, self.completions.completion_mask], dim=1)
 

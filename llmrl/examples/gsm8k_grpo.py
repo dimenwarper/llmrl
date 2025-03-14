@@ -23,7 +23,7 @@ def run(
     
     print(f"Loading model from {model_path}...")
     tokenizer_path = tokenizer_path if tokenizer_path is not None else model_path
-    model, tokenizer = models.hf_model(model_path, device, tokenizer_path)
+    model, tokenizer = models.hf_model(model_path, quantized=True, tokenizer_name=tokenizer_path)
     
     special_tokens = {"pad_token": "[PAD]"}
     if tokenizer.pad_token is None:
@@ -46,23 +46,25 @@ def run(
     clipped_pg_loss = loss.GroupedPolicyGradientLoss(
         name="policy_gradient",
         model=model,
+        tokenizer=tokenizer,
         reward_function=(
             rewards.NumericMatch()
             + rewards.FormatMatch(pattern="\d+", on_mismatch=-10)
         ),
         clip_ratio=clip_ratio, 
-        normalize_advantages=True
     )
 
     entropy_reg = loss.EntropyRegularizer(
         name="entropy_regularizer",
         model=model,
+        tokenizer=tokenizer,
         coefficient=entropy_coef
     )
 
     kl_reg = loss.KLDivergenceRegularizer(
         name="kl_div_regularizer",
         model=model,
+        tokenizer=tokenizer,
         coefficient=kl_coef, 
         target_kl=target_kl, 
         adaptive=True
@@ -73,7 +75,7 @@ def run(
     trainer = Trainer(
         composite_loss=loss_fn,
         device=device,
-        optimizer_kwargs={"learning_rate": learning_rate}
+        optimizer_kwargs={"lr": learning_rate}
     )
     
     print(f"Starting training for {num_epochs} epochs...")

@@ -56,14 +56,14 @@ class ExactMatch(RewardFunction):
         
     def __call__(self, prompts, completions, answers=None):
         if answers is None:
-            return [0.0] * len(prompts)
+            return np.zeros(len(prompts))
             
         rewards = []
         for completion, answer in zip(completions.texts, answers):
             extracted = self.extract_fn(completion)
             rewards.append(1.0 if extracted == answer else 0.0)
             
-        return rewards
+        return np.array(rewards)
 
 
 class NumericMatch(RewardFunction):
@@ -79,7 +79,7 @@ class NumericMatch(RewardFunction):
         
     def __call__(self, prompts, completions, answers=None):
         if answers is None:
-            return [0.0] * len(prompts)
+            return np.zeros(len(prompts))
             
         rewards = []
         for completion, answer in zip(completions.texts, answers):
@@ -93,7 +93,7 @@ class NumericMatch(RewardFunction):
             else:
                 rewards.append(0.0)
                 
-        return rewards
+        return np.array(rewards)
 
 
 class FormatMatch(RewardFunction):
@@ -113,7 +113,7 @@ class FormatMatch(RewardFunction):
                 
             rewards.append(self.on_match if match else self.on_mismatch)
             
-        return rewards
+        return np.array(rewards)
 
 
 class ExternalTool(RewardFunction):
@@ -121,7 +121,11 @@ class ExternalTool(RewardFunction):
         self.tool_fn = tool_fn
         
     def __call__(self, prompts, completions, answers=None):
-        return self.tool_fn(prompts, completions.texts, answers)
+        result = self.tool_fn(prompts, completions.texts, answers)
+        # Convert to numpy array if it's not already one
+        if not isinstance(result, np.ndarray):
+            result = np.array(result)
+        return result
 
 
 class Linear(RewardFunction):
@@ -133,7 +137,7 @@ class Linear(RewardFunction):
         
     def __call__(self, prompts, completions, answers=None):
         if answers is None:
-            return [0.0] * len(prompts)
+            return np.zeros(len(prompts))
             
         rewards = []
         for completion, answer in zip(completions.texts, answers):
@@ -146,4 +150,4 @@ class Linear(RewardFunction):
             except:
                 rewards.append(0.0)
                 
-        return rewards
+        return np.array(rewards)

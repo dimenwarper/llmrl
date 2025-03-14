@@ -2,6 +2,14 @@ import torch
 import torch.nn.functional as F
 import copy
 
+def move_to(model, device):
+    # Super janky but ehhh
+    try:
+        return model.to(device)
+    except ValueError:
+        pass
+    return model
+
 def compute_log_probs(model, input_ids, attention_mask, logits_to_keep):
     """
     Compute per-token log probabilities for a subset of tokens (typically the completion tokens).
@@ -63,9 +71,8 @@ def create_completion_mask(completion_ids, eos_token_id):
     return completion_mask
 
 def generate_reference_model(model):
-    reference_model = copy.deepcopy(policy_model)
+    reference_model = copy.deepcopy(model)
     reference_model.eval()
     for param in reference_model.parameters():
         param.requires_grad = False
-    reference_model = reference_model.to()
     return reference_model

@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +12,10 @@ from abc import ABC, abstractmethod
 class LossComponent(ABC):
     """Base class for all loss components."""
     def __init__(self, device=None, name=None):
-        self.device = device
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
         self.name = name or self.__class__.__name__
     
     def epoch_callback(self):
@@ -110,6 +112,7 @@ class ClippedPolicyGradientLoss(LossComponent):
     
     def __init__(
             self,
+            name,
             model, 
             value_model,
             tokenizer, 
@@ -118,7 +121,6 @@ class ClippedPolicyGradientLoss(LossComponent):
             discount_factor: float = 0.99,
             gae_lambda: float = 0.95,
             normalize_advantages: bool = True,
-            name: str = None,
             **kwargs
             ):
         super().__init__(name=name, **kwargs)
@@ -170,14 +172,16 @@ class GroupedPolicyGradientLoss(LossComponent):
     
     def __init__(
             self, 
-            model: nn.Module, 
+            name,
+            model, 
+            tokenizer,
             reward_function: Union[Callable, RewardFunction],
             clip_ratio: float = 0.2,
             num_generations=4,
-            name: str = None,
             **kwargs
     ):
         super().__init__(name=name, **kwargs)
+        self.tokenizer = tokenizer
         self.model = model
         self.clip_ratio = clip_ratio
         self.num_generations = num_generations
@@ -212,6 +216,7 @@ class GroupedPolicyGradientLoss(LossComponent):
         mean_rewards = mean_rewards.repeat_interleave(self.num_generations, dim=0)
         std_rewards = std_rewards.repeat_interleave(self.num_generations, dim=0)
         advantages = (rewards - mean_rewards) / (std_rewards + 1e-4)
+        advantages = advantages.unsqueeze(1)
 
         # Essentially the same as PPO above
         surrogate1 = ratio * advantages
@@ -228,6 +233,7 @@ class MuesliPolicyLoss(LossComponent):
     
     def __init__(
             self,
+            name,
             model,
             value_model,
             tokenizer,
@@ -239,7 +245,6 @@ class MuesliPolicyLoss(LossComponent):
             max_importance_weight: float = 10.0,
             min_importance_weight: float = 0.1,
             coefficient: float = 1.0,
-            name: str = None,
             **kwargs
             ):
         super().__init__(name=name, **kwargs)
@@ -330,10 +335,10 @@ class EntropyRegularizer(LossComponent):
     
     def __init__(
             self, 
+            name,
             model = None, 
             tokenizer = None,
             coefficient: float = 0.01,
-            name: str = None
             ):
         super().__init__(name=name)
         self.model = model
@@ -345,7 +350,7 @@ class EntropyRegularizer(LossComponent):
             self.model, 
             self.tokenizer, 
         )
-        action_probs = np.exp(batch.completions.log_probs)
+        action_probs = torch.exp(batch.completions.log_probs)
         entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1).mean()
         return -self.coefficient * entropy
 
@@ -357,12 +362,12 @@ class KLDivergenceRegularizer(LossComponent):
     
     def __init__(
             self, 
+            name,
             model = None,
             tokenizer = None,
             coefficient: float = 0.1, 
             target_kl: float = 0.01, 
             adaptive: bool = True,
-            name: str = None
             ):
         super().__init__(name=name)
         self.model = model
@@ -397,9 +402,9 @@ class ValueFunctionLoss(LossComponent):
     
     def __init__(
             self, 
+            name,
             value_network: nn.Module, 
             coefficient: float = 0.5,
-            name: str = None
             ):
         super().__init__(name=name)
         self.value_network = value_network
@@ -415,11 +420,11 @@ class MuZeroConsistencyLoss(LossComponent):
     
     def __init__(
             self, 
+            name,
             dynamics: Dynamics, 
             dynamics_model, 
             tokenizer,
             coefficient: float = 1.0,
-            name: str = None
             ):
         # The dynamics function should be (prompt_texts, completion_texts) => (new_texts)
         self.dynamics = dynamics
@@ -459,6 +464,7 @@ class MuZeroLoss(LossComponent):
     
     def __init__(
             self,
+            name,
             representation_model,  # h: observation -> latent state s
             dynamics_model,        # g: (s_t, a_t) -> (r_t, s_{t+1})
             prediction_model,      # f: s -> (policy, value)
@@ -472,7 +478,6 @@ class MuZeroLoss(LossComponent):
             discount_factor: float = 0.997,
             num_unroll_steps: int = 5,
             td_steps: int = 10,
-            name: str = None,
             **kwargs
             ):
         super().__init__(name=name, **kwargs)
