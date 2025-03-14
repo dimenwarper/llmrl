@@ -43,7 +43,7 @@ def run(
     )
 
     print("Setting up loss functions...")
-    clipped_pg_loss = loss.GroupedPolicyGradientLoss(
+    grpo_loss = loss.GroupedPolicyGradientLoss(
         name="policy_gradient",
         model=model,
         tokenizer=tokenizer,
@@ -70,7 +70,7 @@ def run(
         adaptive=True
     )
 
-    loss_fn = loss.CompositeLoss() + clipped_pg_loss + entropy_reg + kl_reg
+    loss_fn = loss.CompositeLoss() + grpo_loss + entropy_reg + kl_reg
     
     trainer = Trainer(
         composite_loss=loss_fn,
