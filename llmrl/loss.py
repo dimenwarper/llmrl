@@ -351,7 +351,7 @@ class EntropyRegularizer(LossComponent):
             self.tokenizer, 
         )
         action_probs = torch.exp(batch.completions.log_probs)
-        entropy = -torch.sum(action_probs * torch.log(action_probs + 1e-8), dim=-1).mean()
+        entropy = -torch.sum(action_probs * batch.completions.log_probs, dim=-1).mean()
         return -self.coefficient * entropy
 
 
@@ -385,6 +385,7 @@ class KLDivergenceRegularizer(LossComponent):
         ref_log_probs = batch.completions.log_probs
         log_probs = batch.compute_full_sequence_logprobs(self.model)
         kl_div = torch.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1
+        kl_div = kl_div.mean()
         
         # Adaptive coefficient based on how far we are from target KL
         if self.adaptive:
@@ -649,6 +650,7 @@ class CompositeLoss:
         
         for name, component in self.components.items():
             loss = component.compute(batch)
+            print(name, loss)
             total_loss += loss
             
             if track_components:
