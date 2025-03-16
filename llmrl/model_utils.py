@@ -70,6 +70,9 @@ def create_completion_mask(completion_ids, eos_token_id):
     
     return completion_mask
 
+def apply_mask(tnsr, mask):
+    return (tnsr * mask).sum(dim=1) / mask.sum(dim=1)
+
 def generate_reference_model(model):
     reference_model = copy.deepcopy(model)
     reference_model.eval()

@@ -165,7 +165,8 @@ class ClippedPolicyGradientLoss(LossComponent):
         surrogate1 = ratio * advantages
         surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
         
-        return -torch.min(surrogate1, surrogate2).mean()
+        combined = -torch.min(surrogate1, surrogate2).mean()
+        return model_utils.apply_mask(combined, batch.completions.completion_mask)
 
 class GroupedPolicyGradientLoss(LossComponent):
     """GRPO-style clipped policy gradient loss."""
@@ -222,7 +223,8 @@ class GroupedPolicyGradientLoss(LossComponent):
         surrogate1 = ratio * advantages
         surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
         
-        return -torch.min(surrogate1, surrogate2).mean()
+        combined = -torch.min(surrogate1, surrogate2).mean()
+        return model_utils.apply_mask(combined, batch.completions.completion_mask)
 
 
 class MuesliPolicyLoss(LossComponent):
@@ -385,7 +387,7 @@ class KLDivergenceRegularizer(LossComponent):
         ref_log_probs = batch.completions.log_probs
         log_probs = batch.compute_full_sequence_logprobs(self.model)
         kl_div = torch.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1
-        kl_div = kl_div.mean()
+        kl_div = model_utils.apply_mask(kl_div, batch.completions.completion_mask).mean()
         
         # Adaptive coefficient based on how far we are from target KL
         if self.adaptive:
