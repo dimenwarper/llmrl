@@ -32,7 +32,7 @@ def run(
             model.resize_token_embeddings(len(tokenizer))
     
     print(f"Loading GSM8K dataset with {num_samples} samples...")
-    evl = Eval(model, "openai/gsm8k", num_samples=num_samples)
+    evl = Eval(model, "openai/gsm8k", dataset_kwargs={"name": "main"}, num_samples=num_samples)
     train_prompts, train_answers = evl.extract_training_data(num_samples=num_samples)
     train_data = RLBatch.from_tokenizer(
         tokenizer=tokenizer,

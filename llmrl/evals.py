@@ -3,11 +3,11 @@ from datasets import load_dataset
 import re
 
 class Eval:
-    def __init__(self, model, dataset_name, num_samples=10, verbose=False, device=None):
+    def __init__(self, model, dataset_name, dataset_kwargs, num_samples=10, verbose=False, device=None):
         self.dataset_name = dataset_name
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model
-        self.dataset = load_dataset(dataset_name, ignore_verifications=True)
+        self.dataset = load_dataset(dataset_name, **dataset_kwargs)
         self.verbose = verbose
         self.num_samples = num_samples
     
