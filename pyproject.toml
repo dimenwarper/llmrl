@@ -1,0 +1,13 @@
+[project]
+name = "llmrl"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "datasets>=3.4.0",
+    "peft>=0.14.0",
+    "torch>=2.6.0",
+    "torchvision>=0.21.0",
+    "transformers>=4.49.0",
+]
