@@ -9,7 +9,7 @@ def run(
         model_path,
         tokenizer_path=None,
         batch_size=32,
-        num_samples=50,
+        num_samples=32,
         num_epochs=10,
         learning_rate=1e-4,
         clip_ratio=0.2,
@@ -43,16 +43,18 @@ def run(
     )
 
     print("Setting up loss functions...")
-    grpo_loss = loss.GroupedPolicyGradientLoss(
+    grpo_loss = loss.GroupedRelativePolicyGradientLoss(
         name="policy_gradient",
         model=model,
         tokenizer=tokenizer,
         reward_function=(
             rewards.NumericMatch()
-            + rewards.FormatMatch(pattern="\d+", on_mismatch=-10)
+            + rewards.FormatMatch(pattern="\d+", on_mismatch=0, on_match=10)
         ),
         clip_ratio=clip_ratio, 
     )
+
+    """
 
     entropy_reg = loss.EntropyRegularizer(
         name="entropy_regularizer",
@@ -69,8 +71,9 @@ def run(
         target_kl=target_kl, 
         adaptive=True
     )
+    """
 
-    loss_fn = loss.CompositeLoss() + grpo_loss + entropy_reg + kl_reg
+    loss_fn = loss.CompositeLoss() + grpo_loss# + entropy_reg + kl_reg
     
     trainer = Trainer(
         composite_loss=loss_fn,
@@ -91,10 +94,10 @@ def main():
     parser = argparse.ArgumentParser(description="Train a model on GSM8K using GRPO")
     parser.add_argument("--model-path", type=str, required=True, help="Path to the model or model name on HuggingFace")
     parser.add_argument("--tokenizer-path", type=str, default=None, help="Path to the tokenizer (defaults to model-path)")
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for training")
-    parser.add_argument("--num-samples", type=int, default=50, help="Number of samples to use from GSM8K")
+    parser.add_argument("--batch-size", type=int, default=16, help="Batch size for training")
+    parser.add_argument("--num-samples", type=int, default=32, help="Number of samples to use from GSM8K")
     parser.add_argument("--num-epochs", type=int, default=10, help="Number of training epochs")
-    parser.add_argument("--learning-rate", type=float, default=1e-4, help="Learning rate for the optimizer")
+    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate for the optimizer")
     parser.add_argument("--clip-ratio", type=float, default=0.2, help="Clipping ratio for PPO")
     parser.add_argument("--entropy-coef", type=float, default=0.01, help="Entropy regularization coefficient")
     parser.add_argument("--kl-coef", type=float, default=0.1, help="KL divergence regularization coefficient")

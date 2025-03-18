@@ -168,7 +168,7 @@ class ClippedPolicyGradientLoss(LossComponent):
         combined = -torch.min(surrogate1, surrogate2).mean()
         return model_utils.apply_mask(combined, batch.completions.completion_mask).mean()
 
-class GroupedPolicyGradientLoss(LossComponent):
+class GroupedRelativePolicyGradientLoss(LossComponent):
     """GRPO-style clipped policy gradient loss."""
     
     def __init__(
@@ -222,7 +222,7 @@ class GroupedPolicyGradientLoss(LossComponent):
         # Essentially the same as PPO above
         surrogate1 = ratio * advantages
         surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
-        
+
         combined = -torch.min(surrogate1, surrogate2).mean()
         return model_utils.apply_mask(combined, batch.completions.completion_mask).mean()
 
