@@ -33,7 +33,6 @@ def generate_completions(
         prompt_mask,
         num_generations=1, 
         max_completion_length=32,
-        no_grad_for_log_probs=False,
 ) -> Completions:
     """
     Generate multiple completions for each prompt and create corresponding attention masks.
@@ -60,15 +59,16 @@ def generate_completions(
     prompt_mask = prompt_mask.repeat_interleave(num_generations, dim=0) # New shape: (batch_size*num_generations, prompt_seq_len)
 
     # Generate new tokens for each prompt. The output includes the original prompt and the generated tokens.
-    outputs = model.generate(
-        prompt_ids,
-        attention_mask=prompt_mask,
-        max_new_tokens=max_completion_length,
-        do_sample=True,
-        temperature=1.0,
-        pad_token_id=tokenizer.pad_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-    )
+    with torch.no_grad():
+        outputs = model.generate(
+            prompt_ids,
+            attention_mask=prompt_mask,
+            max_new_tokens=max_completion_length,
+            do_sample=True,
+            temperature=1.0,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
     
     # Remove the prompt portion from the generated output to isolate the completion tokens.
     completion_ids = outputs[:, prompt_length:]  # Shape: (batch_size*num_generations, completion_seq_len)

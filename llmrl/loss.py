@@ -160,12 +160,14 @@ class ClippedPolicyGradientLoss(LossComponent):
         if self.normalize_advantages and advantages.shape[0] > 1:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
             
-        ratio = torch.exp(log_probs - batch.completions.old_log_probs)
+        ratio = torch.nan_to_num(
+            torch.exp(log_probs - batch.completions.old_log_probs)
+        )
         
         surrogate1 = ratio * advantages
         surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
         
-        combined = -torch.min(surrogate1, surrogate2).mean()
+        combined = -torch.min(surrogate1, surrogate2)
         return model_utils.apply_mask(combined, batch.completions.completion_mask).mean()
 
 class GroupedRelativePolicyGradientLoss(LossComponent):
@@ -195,7 +197,9 @@ class GroupedRelativePolicyGradientLoss(LossComponent):
             num_generations=self.num_generations
         )
         log_probs = batch.completions.log_probs
-        ratio = torch.exp(log_probs - batch.completions.old_log_probs)
+        ratio = torch.nan_to_num(
+            torch.exp(log_probs - batch.completions.old_log_probs)
+        )
 
         # Repeat each prompt for each generated completion.
         repeated_prompts = [p for p in batch.texts for _ in range(self.num_generations)]
@@ -222,8 +226,9 @@ class GroupedRelativePolicyGradientLoss(LossComponent):
         # Essentially the same as PPO above
         surrogate1 = ratio * advantages
         surrogate2 = torch.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages
+        
 
-        combined = -torch.min(surrogate1, surrogate2).mean()
+        combined = -torch.min(surrogate1, surrogate2)
         return model_utils.apply_mask(combined, batch.completions.completion_mask).mean()
 
 

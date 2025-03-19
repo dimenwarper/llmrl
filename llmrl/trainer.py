@@ -11,7 +11,7 @@ class Trainer:
         composite_loss,
         optimizer_kwargs: dict,
         device,
-        max_grad_norm: float = 0.1, # For grad clipping
+        max_grad_norm: float = 1.0, # For grad clipping
     ):
         self.composite_loss = composite_loss
         self.device = device
@@ -32,8 +32,6 @@ class Trainer:
         
         self.optimizer = Adam(all_parameters, **optimizer_kwargs)
 
-        for model in self.models:
-            model.train()
 
     def train_step(self, batch: RLBatch) -> Dict[str, float]:
         batch.to(self.device)
@@ -59,6 +57,8 @@ class Trainer:
         callbacks: Optional[List[callable]] = None,
         log_interval: int = 10
     ):
+        for model in self.models:
+            model.train()
         for epoch in range(num_epochs):
             epoch_losses = []
             
