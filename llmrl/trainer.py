@@ -11,7 +11,7 @@ class Trainer:
         composite_loss,
         optimizer_kwargs: dict,
         device,
-        max_grad_norm: float = 1.0, # For grad clipping
+        max_grad_norm: float = 0.1, # For grad clipping
     ):
         self.composite_loss = composite_loss
         self.device = device

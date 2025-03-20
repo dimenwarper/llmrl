@@ -23,7 +23,7 @@ def run(
     
     print(f"Loading model from {model_path}...")
     tokenizer_path = tokenizer_path if tokenizer_path is not None else model_path
-    model, tokenizer = models.hf_model(model_path, quantized=True, tokenizer_name=tokenizer_path)
+    model, tokenizer = models.hf_model(model_path, quantized=False, tokenizer_name=tokenizer_path)
     
     special_tokens = {"pad_token": "[PAD]"}
     if tokenizer.pad_token is None:
@@ -54,8 +54,6 @@ def run(
         clip_ratio=clip_ratio, 
     )
 
-    """
-
     entropy_reg = loss.EntropyRegularizer(
         name="entropy_regularizer",
         model=model,
@@ -71,9 +69,8 @@ def run(
         target_kl=target_kl, 
         adaptive=True
     )
-    """
 
-    loss_fn = loss.CompositeLoss() + grpo_loss# + entropy_reg + kl_reg
+    loss_fn = loss.CompositeLoss() + grpo_loss + entropy_reg + kl_reg
     
     trainer = Trainer(
         composite_loss=loss_fn,

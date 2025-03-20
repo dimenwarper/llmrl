@@ -197,8 +197,9 @@ class GroupedRelativePolicyGradientLoss(LossComponent):
             num_generations=self.num_generations
         )
         log_probs = batch.completions.log_probs
-        ratio = torch.nan_to_num(
-            torch.exp(log_probs - batch.completions.old_log_probs)
+        ratio = torch.clamp(
+            torch.exp(log_probs - batch.completions.old_log_probs),
+            min=-0.001, max=1000
         )
 
         # Repeat each prompt for each generated completion.
