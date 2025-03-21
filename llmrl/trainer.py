@@ -35,14 +35,12 @@ class Trainer:
 
     def train_step(self, batch: RLBatch) -> Dict[str, float]:
         batch.to(self.device)
-        self.optimizer.zero_grad()
-
         loss, component_losses = self.composite_loss.compute(batch, track_components=True)
+
+        self.optimizer.zero_grad()
         loss.backward()
-        
         for model in self.models:
             torch.nn.utils.clip_grad_norm_(model.parameters(), self.max_grad_norm)
-        
         self.optimizer.step()
         
         return {

@@ -389,9 +389,9 @@ class KLDivergenceRegularizer(LossComponent):
         self.reference_model = model_utils.generate_reference_model(self.model)
     
     def compute(self, batch: RLBatch) -> torch.Tensor:
-        batch.rollout_completions(self.reference_model, self.tokenizer)
-        ref_log_probs = batch.completions.log_probs
-        log_probs = batch.compute_full_sequence_logprobs(self.model)
+        batch.rollout_completions(self.model, self.tokenizer)
+        log_probs = batch.completions.log_probs
+        ref_log_probs = batch.compute_full_sequence_logprobs(self.reference_model)
         kl_div = torch.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1
         kl_div = model_utils.apply_mask(kl_div, batch.completions.completion_mask).mean()
         

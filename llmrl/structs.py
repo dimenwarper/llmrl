@@ -8,14 +8,18 @@ import torch.nn.functional as F
 from typing import Optional, Dict, List, Tuple, Union, Any
 from llmrl.model_utils import create_completion_mask, compute_log_probs
 
+ModelLike = Any
+
 @dataclass
 class Completions:
     """Data structure for completions (including logprobs)"""
     completion_ids: torch.Tensor
     log_probs: torch.Tensor
     old_log_probs: torch.Tensor
+    num_generations: int
     texts: list[str]
     completion_mask: Optional[torch.Tensor] = None
+    model: Optional[ModelLike] = None
 
     def to(self, device):
         self.completion_ids = self.completion_ids.to(device)
@@ -24,6 +28,9 @@ class Completions:
         if self.completion_mask is not None:
             self.completion_mask = self.completion_mask.to(device)
         return self
+    
+    def __len__(self):
+        return len(self.texts)
 
 
 def generate_completions(
@@ -98,8 +105,10 @@ def generate_completions(
         completion_ids=completion_ids, 
         completion_mask=completion_mask,
         texts=texts,
+        num_generations=num_generations,
         log_probs=token_log_probs,
-        old_log_probs=old_log_probs
+        old_log_probs=old_log_probs,
+        model=model
     )
 
 
@@ -148,34 +157,49 @@ class RLBatch:
     
     def compute_full_sequence_logprobs(self, model):
         assert self.completions is not None, "Completions are None! Did you forget to rollout_completions?"
-        input_ids = torch.cat([self.prompt_ids, self.completions.completion_ids], dim=1)
-        attention_mask = torch.cat([self.attention_mask, self.completions.completion_mask], dim=1)
+        # We have to repeat the prompts like in generate_completions to match the completions shape
+        prompt_ids = self.prompt_ids.repeat_interleave(self.completions.num_generations, dim=0)
+        prompt_mask = self.attention_mask.repeat_interleave(self.completions.num_generations, dim=0)
+
+        input_ids = torch.cat([prompt_ids, self.completions.completion_ids], dim=1)
+        attention_mask = torch.cat([prompt_mask, self.completions.completion_mask], dim=1)
 
         # Get the logits
         logits_to_keep = self.completions.completion_ids.size(1)
 
         return compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
 
+    def __len__(self):
+        return len(self.texts)
+
+
     def rollout_completions(
                 self, 
                 model, 
                 tokenizer,
                 num_generations=1,
-                max_completion_length=32
+                max_completion_length=32,
+                force_rollout=False,
                 ):
         if model is None:
             # This means that we are not rolling out completions
             # check if completions are not none
             assert self.completions is not None, "Tried to rollout missing completions without a model"
         else:
-            completions = generate_completions(
-                model=model,
-                tokenizer=tokenizer,
-                prompt_ids=self.prompt_ids,
-                prompt_mask=self.attention_mask,
-                num_generations=num_generations,
-                max_completion_length=max_completion_length
-            )
-            self.completions = completions
+            if force_rollout or self.completions is None or self.completions.model != model:
+                if force_rollout:
+                    print("Rolling out completions due to force_rollout...")
+                else:
+                    print("Completions have not been generated yet for this model, rolling them out...")
+                self.completions = generate_completions(
+                    model=model,
+                    tokenizer=tokenizer,
+                    prompt_ids=self.prompt_ids,
+                    prompt_mask=self.attention_mask,
+                    num_generations=num_generations,
+                    max_completion_length=max_completion_length
+                )
+            else:
+                print("Completions have been rolled out already for this model, skipping rollout")
 
 
