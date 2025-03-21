@@ -655,7 +655,8 @@ class CompositeLoss:
     def compute(self, batch: RLBatch, track_components=False):
         total_loss = 0.0
         component_losses = {}
-        
+
+        batch.completions = None 
         for name, component in self.components.items():
             loss = component.compute(batch)
             print(name, loss)

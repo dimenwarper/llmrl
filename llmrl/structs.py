@@ -16,9 +16,11 @@ class Completions:
     completion_ids: torch.Tensor
     log_probs: torch.Tensor
     old_log_probs: torch.Tensor
+    full_seq_ids: torch.Tensor 
     num_generations: int
     texts: list[str]
     completion_mask: Optional[torch.Tensor] = None
+    full_seq_mask: Optional[torch.Tensor] = None
     model: Optional[ModelLike] = None
 
     def to(self, device):
@@ -104,6 +106,8 @@ def generate_completions(
     return Completions(
         completion_ids=completion_ids, 
         completion_mask=completion_mask,
+        full_seq_ids=input_ids,
+        full_seq_mask=attention_mask,
         texts=texts,
         num_generations=num_generations,
         log_probs=token_log_probs,
@@ -157,17 +161,10 @@ class RLBatch:
     
     def compute_full_sequence_logprobs(self, model):
         assert self.completions is not None, "Completions are None! Did you forget to rollout_completions?"
-        # We have to repeat the prompts like in generate_completions to match the completions shape
-        prompt_ids = self.prompt_ids.repeat_interleave(self.completions.num_generations, dim=0)
-        prompt_mask = self.attention_mask.repeat_interleave(self.completions.num_generations, dim=0)
-
-        input_ids = torch.cat([prompt_ids, self.completions.completion_ids], dim=1)
-        attention_mask = torch.cat([prompt_mask, self.completions.completion_mask], dim=1)
-
         # Get the logits
         logits_to_keep = self.completions.completion_ids.size(1)
 
-        return compute_log_probs(model, input_ids, attention_mask, logits_to_keep)
+        return compute_log_probs(model, self.completions.full_seq_ids, self.completions.full_seq_mask, logits_to_keep)
 
     def __len__(self):
         return len(self.texts)
