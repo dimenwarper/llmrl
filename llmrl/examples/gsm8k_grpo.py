@@ -1,9 +1,12 @@
-import torch
+from functools import partial
 import argparse
+import torch
 from llmrl import loss, models, rewards
 from llmrl.trainer import Trainer
 from llmrl.evals import Eval
 from llmrl.structs import RLBatch
+from llmrl.examples.modal_utils import maybe_run_with_modal
+
 
 def run(
         model_path,
@@ -100,21 +103,26 @@ def main():
     parser.add_argument("--kl-coef", type=float, default=0.1, help="KL divergence regularization coefficient")
     parser.add_argument("--target-kl", type=float, default=0.01, help="Target KL divergence")
     parser.add_argument("--device", type=str, default=None, help="Device to use (defaults to CUDA if available, else CPU)")
+    parser.add_argument("--modal", default=False, action="store_true", help="Run this in modal or not")
     
     args = parser.parse_args()
     
-    run(
-        model_path=args.model_path,
-        tokenizer_path=args.tokenizer_path,
-        batch_size=args.batch_size,
-        num_samples=args.num_samples,
-        num_epochs=args.num_epochs,
-        learning_rate=args.learning_rate,
-        clip_ratio=args.clip_ratio,
-        entropy_coef=args.entropy_coef,
-        kl_coef=args.kl_coef,
-        target_kl=args.target_kl,
-        device=args.device,
+    maybe_run_with_modal(
+        partial(
+            run,
+            model_path=args.model_path,
+            tokenizer_path=args.tokenizer_path,
+            batch_size=args.batch_size,
+            num_samples=args.num_samples,
+            num_epochs=args.num_epochs,
+            learning_rate=args.learning_rate,
+            clip_ratio=args.clip_ratio,
+            entropy_coef=args.entropy_coef,
+            kl_coef=args.kl_coef,
+            target_kl=args.target_kl,
+            device=args.device,
+        ),
+        args.modal
     )
 
 if __name__ == "__main__":

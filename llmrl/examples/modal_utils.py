@@ -29,4 +29,16 @@ def create_modal_image_from_pyproject(pyproject_path="pyproject.toml"):
     
     return image, app
 
-image, app = create_modal_image_from_pyproject()
+IMAGE, APP = create_modal_image_from_pyproject()
+
+@APP.local_entrypoint()
+def maybe_run_with_modal(
+        fun, 
+        flag
+):
+    wrapped = APP.function(gpu="any", image=IMAGE)
+    if flag:
+        result = wrapped.remote()
+    else:
+        result = fun()
+    return fun
