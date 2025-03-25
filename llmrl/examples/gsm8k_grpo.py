@@ -5,7 +5,7 @@ from llmrl import loss, models, rewards
 from llmrl.trainer import Trainer
 from llmrl.evals import Eval
 from llmrl.structs import RLBatch
-from llmrl.examples.modal_utils import maybe_run_with_modal
+from llmrl.examples.modal_utils import app, test, maybe_run_with_modal
 
 
 def run(
@@ -106,6 +106,11 @@ def main():
     parser.add_argument("--modal", default=False, action="store_true", help="Run this in modal or not")
     
     args = parser.parse_args()
+
+    entrypoint = app.local_entrypoint()(
+        test([('one', 'str'), ('two', 'int')])
+    )
+    entrypoint()
     
     maybe_run_with_modal(
         partial(
