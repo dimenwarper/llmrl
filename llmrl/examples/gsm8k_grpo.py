@@ -107,27 +107,18 @@ def main():
     
     args = parser.parse_args()
 
-    entrypoint = app.local_entrypoint()(
-        test([('one', 'str'), ('two', 'int')])
-    )
-    entrypoint()
-    
-    maybe_run_with_modal(
-        partial(
-            run,
-            model_path=args.model_path,
-            tokenizer_path=args.tokenizer_path,
-            batch_size=args.batch_size,
-            num_samples=args.num_samples,
-            num_epochs=args.num_epochs,
-            learning_rate=args.learning_rate,
-            clip_ratio=args.clip_ratio,
-            entropy_coef=args.entropy_coef,
-            kl_coef=args.kl_coef,
-            target_kl=args.target_kl,
-            device=args.device,
-        ),
-        args.modal
+    run(
+        model_path=args.model_path,
+        tokenizer_path=args.tokenizer_path,
+        batch_size=args.batch_size,
+        num_samples=args.num_samples,
+        num_epochs=args.num_epochs,
+        learning_rate=args.learning_rate,
+        clip_ratio=args.clip_ratio,
+        entropy_coef=args.entropy_coef,
+        kl_coef=args.kl_coef,
+        target_kl=args.target_kl,
+        device=args.device,
     )
 
 if __name__ == "__main__":
