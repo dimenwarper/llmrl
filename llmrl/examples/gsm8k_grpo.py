@@ -103,7 +103,6 @@ def main():
     parser.add_argument("--kl-coef", type=float, default=0.1, help="KL divergence regularization coefficient")
     parser.add_argument("--target-kl", type=float, default=0.01, help="Target KL divergence")
     parser.add_argument("--device", type=str, default=None, help="Device to use (defaults to CUDA if available, else CPU)")
-    parser.add_argument("--modal", default=False, action="store_true", help="Run this in modal or not")
     
     args = parser.parse_args()
 

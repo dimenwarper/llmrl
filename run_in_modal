@@ -1,0 +1,13 @@
+#!/bin/bash
+COMMAND=${@/--local/}
+
+# Construct the modal command
+MODAL_COMMAND="modal run modal_utils.py --command \"$COMMAND\""
+if [[ $@ == *"--local"* ]]; then
+    MODAL_COMMAND="$MODAL_COMMAND --local true"
+else
+    MODAL_COMMAND="$MODAL_COMMAND --local false"
+fi
+
+echo $MODAL_COMMAND
+eval "$MODAL_COMMAND"
