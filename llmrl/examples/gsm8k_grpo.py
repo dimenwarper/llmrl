@@ -1,11 +1,9 @@
-from functools import partial
 import argparse
 import torch
 from llmrl import loss, models, rewards
 from llmrl.trainer import Trainer
 from llmrl.evals import Eval
 from llmrl.structs import RLBatch
-from llmrl.examples.modal_utils import app, test, maybe_run_with_modal
 
 
 def run(
