@@ -58,8 +58,7 @@ def create_modal_image_from_pyproject(pyproject_path="pyproject.toml"):
         image
         .env(
             dict(
-                HUGGINGFACE_HUB_CACHE="/pretrained",
-                HF_HUB_ENABLE_HF_TRANSFER="1",
+                HF_HOME="/artifacts/hg_face/",
                 TQDM_DISABLE="true",
             )
         )
@@ -86,7 +85,11 @@ VOLUME_CONFIG: dict[Union[str, PurePosixPath], modal.Volume] = {
     "/artifacts/": artifact_volume,
 }
 
-@app.function(image=image)
+@app.function(
+        gpu="L40S",
+        volumes=VOLUME_CONFIG,
+        image=image
+        )
 def run_command(command):
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout, result.stderr

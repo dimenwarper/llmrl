@@ -66,7 +66,7 @@ class Trainer:
                 
                 if batch_idx % log_interval == 0:
                     avg_loss = sum(l["total_loss"] for l in epoch_losses[-log_interval:]) / min(log_interval, len(epoch_losses))
-                    print(f"Epoch {epoch}, Batch {batch_idx}, Average Loss: {avg_loss:.4f}")
+                    print(f"\n🅴🅿🅾🅲🅷 {epoch}, Batch {batch_idx}, Average Loss: {avg_loss:.4f}")
             
             if callbacks:
                 for callback in callbacks:
