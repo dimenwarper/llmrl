@@ -18,6 +18,8 @@ def run(
         kl_coef=0.1,
         target_kl=0.01,
         device=None,
+        use_wandb=False,
+        wandb_project=None,
 ):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -73,10 +75,24 @@ def run(
 
     loss_fn = loss.CompositeLoss() + grpo_loss + entropy_reg + kl_reg
     
+    wandb_config = {
+        "model_path": model_path,
+        "batch_size": batch_size,
+        "num_samples": num_samples,
+        "learning_rate": learning_rate,
+        "clip_ratio": clip_ratio,
+        "entropy_coef": entropy_coef,
+        "kl_coef": kl_coef,
+        "target_kl": target_kl,
+    }
+    
     trainer = Trainer(
         composite_loss=loss_fn,
         device=device,
-        optimizer_kwargs={"lr": learning_rate}
+        optimizer_kwargs={"lr": learning_rate},
+        use_wandb=use_wandb,
+        wandb_project=wandb_project,
+        wandb_config=wandb_config
     )
     
     print(f"Starting training for {num_epochs} epochs...")
@@ -101,6 +117,8 @@ def main():
     parser.add_argument("--kl-coef", type=float, default=0.1, help="KL divergence regularization coefficient")
     parser.add_argument("--target-kl", type=float, default=0.01, help="Target KL divergence")
     parser.add_argument("--device", type=str, default=None, help="Device to use (defaults to CUDA if available, else CPU)")
+    parser.add_argument("--use-wandb", action="store_true", help="Enable Weights & Biases logging")
+    parser.add_argument("--wandb-project", type=str, default="gsm8k-grpo", help="Weights & Biases project name")
     
     args = parser.parse_args()
 
@@ -116,6 +134,8 @@ def main():
         kl_coef=args.kl_coef,
         target_kl=args.target_kl,
         device=args.device,
+        use_wandb=args.use_wandb,
+        wandb_project=args.wandb_project,
     )
 
 if __name__ == "__main__":
