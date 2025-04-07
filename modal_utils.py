@@ -3,6 +3,7 @@ import modal
 from typing import Union
 from pathlib import PurePosixPath
 import subprocess
+import os
 
 def get_python_modules():
     """Get all top-level Python module directories in current directory"""
@@ -54,14 +55,17 @@ def create_modal_image_from_pyproject(pyproject_path="pyproject.toml"):
     if dependencies:
         image = image.pip_install(*dependencies)
 
+    env_vars = {
+                "HF_HOME": "/artifacts/hg_face/",
+                "TQDM_DISABLE": "true",
+    }
+
+    if "WANDB_API_KEY" in os.environ:
+        env_vars["WANDB_API_KEY"] = os.environ["WANDB_API_KEY"]
+
     image = (
         image
-        .env(
-            dict(
-                HF_HOME="/artifacts/hg_face/",
-                TQDM_DISABLE="true",
-            )
-        )
+        .env(env_vars)
         .entrypoint([])
         .add_local_file(pyproject_path, remote_path="/root/" + pyproject_path)
     )
