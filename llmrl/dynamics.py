@@ -147,3 +147,71 @@ class ContextualDynamics(Dynamics):
         # Simple keyword extraction - in practice, use NLP techniques
         # This just splits on spaces and takes words longer than 4 characters
         return [word.lower() for word in text.split() if len(word) > 4]
+
+
+class CellularAutomataDynamics(Dynamics):
+    """Dynamics that generates text based on cellular automata rules."""
+    
+    def __init__(self, rules: Dict[str, str], initial_states: List[str], config: Optional[Dict[str, Any]] = None):
+        """
+        Args:
+            rules: Dictionary mapping state patterns to next states
+            initial_states: List of initial text states
+            config: Configuration options including:
+                - cell_size: Number of characters per cell (default: 5)
+                - num_steps: Number of automata steps to run (default: 3)
+                - wrap_around: Whether to wrap around at edges (default: True)
+        """
+        super().__init__(config)
+        self.rules = rules
+        self.initial_states = initial_states
+        self.cell_size = config.get('cell_size', 5)
+        self.num_steps = config.get('num_steps', 3)
+        self.wrap_around = config.get('wrap_around', True)
+        self.current_states = initial_states.copy()
+    
+    def __call__(self, prompts: List[str], completions: List[str]) -> List[str]:
+        new_prompts = []
+        
+        for prompt, completion in zip(prompts, completions):
+            # Update the cellular automata state based on the completion
+            self._update_state(completion)
+            
+            # Generate new text based on current state
+            new_text = self._generate_text()
+            
+            # Create new prompt combining original prompt and generated text
+            new_prompt = f"{prompt}\n\nGenerated context: {new_text}\n\nContinue:"
+            new_prompts.append(new_prompt)
+        
+        return new_prompts
+    
+    def _update_state(self, completion: str) -> None:
+        """Update the cellular automata state based on the completion."""
+        # Split completion into cells
+        cells = [completion[i:i+self.cell_size] for i in range(0, len(completion), self.cell_size)]
+        if not cells:
+            return
+            
+        # Apply rules for specified number of steps
+        for _ in range(self.num_steps):
+            new_cells = []
+            for i in range(len(cells)):
+                # Get neighborhood (left, current, right)
+                left = cells[i-1] if i > 0 else (cells[-1] if self.wrap_around else '')
+                current = cells[i]
+                right = cells[i+1] if i < len(cells)-1 else (cells[0] if self.wrap_around else '')
+                
+                # Apply rule based on neighborhood pattern
+                pattern = f"{left}{current}{right}"
+                new_state = self.rules.get(pattern, current)
+                new_cells.append(new_state)
+            
+            cells = new_cells
+        
+        self.current_states = cells
+    
+    def _generate_text(self) -> str:
+        """Generate text from current cellular automata state."""
+        # Combine current states with some formatting
+        return " ".join(self.current_states)

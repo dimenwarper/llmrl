@@ -13,7 +13,7 @@ def run(
         num_samples=10000,
         num_epochs=10,
         learning_rate=1e-4,
-        clip_ratio=0.2,
+        temperature=1.0,
         entropy_coef=0.01,
         kl_coef=0.1,
         target_kl=0.01,
@@ -27,6 +27,11 @@ def run(
     print(f"Loading model from {model_path}...")
     tokenizer_path = tokenizer_path if tokenizer_path is not None else model_path
     model, tokenizer = models.hf_model(model_path, quantized=False, tokenizer_name=tokenizer_path)
+    
+    # Create value model
+    value_model = models.SimpleValueNetwork(model, tokenizer)
+    if not model.quantized:
+        value_model.to(device)
     
     special_tokens = {"pad_token": "[PAD]"}
     if tokenizer.pad_token is None:
@@ -46,15 +51,16 @@ def run(
     )
 
     print("Setting up loss functions...")
-    grpo_loss = loss.GroupedRelativePolicyGradientLoss(
-        name="policy_gradient",
+    muesli_loss = loss.MuesliPolicyLoss(
+        name="muesli_policy",
         model=model,
+        value_model=value_model,  # Using SimpleValueNetwork for value function
         tokenizer=tokenizer,
         reward_function=(
             rewards.NumericMatch()
             + rewards.FormatMatch(pattern="\d+", on_mismatch=0, on_match=10)
         ),
-        clip_ratio=clip_ratio, 
+        temperature=temperature,
     )
 
     entropy_reg = loss.EntropyRegularizer(
@@ -73,14 +79,14 @@ def run(
         adaptive=True
     )
 
-    loss_fn = loss.CompositeLoss() + grpo_loss + entropy_reg + kl_reg
+    loss_fn = loss.CompositeLoss() + muesli_loss + entropy_reg + kl_reg
     
     wandb_config = {
         "model_path": model_path,
         "batch_size": batch_size,
         "num_samples": num_samples,
         "learning_rate": learning_rate,
-        "clip_ratio": clip_ratio,
+        "temperature": temperature,
         "entropy_coef": entropy_coef,
         "kl_coef": kl_coef,
         "target_kl": target_kl,
@@ -105,20 +111,20 @@ def run(
     return model, tokenizer
 
 def main():
-    parser = argparse.ArgumentParser(description="Train a model on GSM8K using GRPO")
+    parser = argparse.ArgumentParser(description="Train a model on GSM8K using Muesli")
     parser.add_argument("--model-path", type=str, required=True, help="Path to the model or model name on HuggingFace")
     parser.add_argument("--tokenizer-path", type=str, default=None, help="Path to the tokenizer (defaults to model-path)")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size for training")
     parser.add_argument("--num-samples", type=int, default=32, help="Number of samples to use from GSM8K")
     parser.add_argument("--num-epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate for the optimizer")
-    parser.add_argument("--clip-ratio", type=float, default=0.2, help="Clipping ratio for PPO")
+    parser.add_argument("--temperature", type=float, default=1.0, help="Temperature for Muesli policy improvement")
     parser.add_argument("--entropy-coef", type=float, default=0.01, help="Entropy regularization coefficient")
     parser.add_argument("--kl-coef", type=float, default=0.1, help="KL divergence regularization coefficient")
     parser.add_argument("--target-kl", type=float, default=0.01, help="Target KL divergence")
     parser.add_argument("--device", type=str, default=None, help="Device to use (defaults to CUDA if available, else CPU)")
     parser.add_argument("--use-wandb", action="store_true", help="Enable Weights & Biases logging")
-    parser.add_argument("--wandb-project", type=str, default="gsm8k-grpo", help="Weights & Biases project name")
+    parser.add_argument("--wandb-project", type=str, default="gsm8k-muesli", help="Weights & Biases project name")
     
     args = parser.parse_args()
 
@@ -129,7 +135,7 @@ def main():
         num_samples=args.num_samples,
         num_epochs=args.num_epochs,
         learning_rate=args.learning_rate,
-        clip_ratio=args.clip_ratio,
+        temperature=args.temperature,
         entropy_coef=args.entropy_coef,
         kl_coef=args.kl_coef,
         target_kl=args.target_kl,
@@ -140,7 +146,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-    
-    
-    
