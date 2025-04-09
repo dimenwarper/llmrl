@@ -10,7 +10,8 @@ def run(
         model_path,
         tokenizer_path=None,
         batch_size=32,
-        num_samples=10000,
+        num_train_samples=1000,
+        num_eval_samples=500,
         num_epochs=10,
         learning_rate=1e-4,
         temperature=1.0,
@@ -39,13 +40,23 @@ def run(
         if num_added_tokens > 0:
             model.resize_token_embeddings(len(tokenizer))
     
-    print(f"Loading GSM8K dataset with {num_samples} samples...")
-    evl = Eval(model, "openai/gsm8k", dataset_kwargs={"name": "main"}, num_samples=num_samples)
-    train_prompts, train_answers = evl.extract_training_data(num_samples=num_samples)
+    print(f"Loading GSM8K dataset with {num_train_samples} samples...")
+    evl = Eval(model, "openai/gsm8k", dataset_kwargs={"name": "main"}, num_train_samples=num_train_samples)
+    train_prompts, train_answers = evl.extract_split(num_train_samples=num_train_samples, split="train")
+    eval_prompts, eval_answers = evl.extract_split(num_train_samples=num_train_samples, split="test")
+
     train_data = RLBatch.from_tokenizer(
         tokenizer=tokenizer,
         prompts=train_prompts,
         targets=train_answers,
+        batch_size=batch_size,
+        device=device
+    )
+
+    eval_data = RLBatch.from_tokenizer(
+        tokenizer=tokenizer,
+        prompts=eval_prompts,
+        targets=eval_answers,
         batch_size=batch_size,
         device=device
     )
@@ -84,7 +95,8 @@ def run(
     wandb_config = {
         "model_path": model_path,
         "batch_size": batch_size,
-        "num_samples": num_samples,
+        "num_train_samples": num_train_samples,
+        "num_eval_samples": num_eval_samples,
         "learning_rate": learning_rate,
         "temperature": temperature,
         "entropy_coef": entropy_coef,
@@ -104,6 +116,7 @@ def run(
     print(f"Starting training for {num_epochs} epochs...")
     trainer.train(
         train_data,
+        eval_dataloader=eval_data,
         num_epochs=num_epochs,
     )
     
@@ -115,7 +128,8 @@ def main():
     parser.add_argument("--model-path", type=str, required=True, help="Path to the model or model name on HuggingFace")
     parser.add_argument("--tokenizer-path", type=str, default=None, help="Path to the tokenizer (defaults to model-path)")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size for training")
-    parser.add_argument("--num-samples", type=int, default=32, help="Number of samples to use from GSM8K")
+    parser.add_argument("--num-eval-samples", type=int, default=1000, help="Number of training samples to use from GSM8K")
+    parser.add_argument("--num-train-samples", type=int, default=500, help="Number of eval samples to use from GSM8K")
     parser.add_argument("--num-epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--learning-rate", type=float, default=1e-3, help="Learning rate for the optimizer")
     parser.add_argument("--temperature", type=float, default=1.0, help="Temperature for Muesli policy improvement")
@@ -132,7 +146,8 @@ def main():
         model_path=args.model_path,
         tokenizer_path=args.tokenizer_path,
         batch_size=args.batch_size,
-        num_samples=args.num_samples,
+        num_train_samples=args.num_train_samples,
+        num_eval_samples=args.num_eval_samples,
         num_epochs=args.num_epochs,
         learning_rate=args.learning_rate,
         temperature=args.temperature,

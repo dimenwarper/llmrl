@@ -13,9 +13,9 @@ class Eval:
     
     def _extract_dataset_answer(self, answer):
         if self.dataset_name.endswith("gsm8k"):
-            return float(answer.split("####")[-1].strip())
+            return float(answer.split("####")[-1].replace(",", "").strip())
 
-    def extract_training_data(self, num_samples, split='train'):
+    def extract_split(self, num_samples, split):
         train_data = self.dataset[split][:num_samples]
         prompts, answers = [], []
         for i in range(num_samples):

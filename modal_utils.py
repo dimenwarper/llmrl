@@ -92,7 +92,8 @@ VOLUME_CONFIG: dict[Union[str, PurePosixPath], modal.Volume] = {
 @app.function(
         gpu="L40S",
         volumes=VOLUME_CONFIG,
-        image=image
+        image=image,
+        timeout=24*60 # max timeout of 1D
         )
 def run_command(command):
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
